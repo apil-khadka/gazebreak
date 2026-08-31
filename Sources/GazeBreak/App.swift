@@ -366,7 +366,22 @@ struct ReminderView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
         .onAppear { remaining = model.currentBreakSeconds }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            if remaining > 0 { remaining -= 1 } else { dismiss(); model.reset() }
+            if remaining > 0 {
+                remaining -= 1
+            } else {
+                playBreakCompletionSound()
+                dismiss()
+                model.reset()
+            }
         }
+    }
+}
+
+private func playBreakCompletionSound() {
+    if let sound = NSSound(named: NSSound.Name("Pop")) {
+        sound.volume = 0.35
+        sound.play()
+    } else {
+        NSSound.beep()
     }
 }
