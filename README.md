@@ -6,6 +6,8 @@ A tiny macOS menu-bar app that helps prevent long, uninterrupted screen sessions
 
 GazeBreak is named for the small, intentional pause it creates in a long period of close-focus work. The abstract mark represents an opening and breathing room rather than a literal eye or medical symbol.
 
+GazeBreak is licensed under the [Apache License 2.0](LICENSE).
+
 ## Download
 
 Download the latest Apple Silicon build from the [GitHub Releases page](https://github.com/apil-khadka/gazebreak/releases/latest). The release is distributed as `GazeBreak-macOS-arm64.zip`.
