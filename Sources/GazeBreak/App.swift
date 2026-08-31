@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let model = GazeBreakModel()
     private var reminderWindow: NSWindow?
     private var workspaceObservers: [NSObjectProtocol] = []
+    private var mouseTrackingMonitors: [Any] = []
+    private var isStatusItemHovered = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -28,11 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        statusItem.button?.imagePosition = .imageLeading
+        statusItem.button?.imagePosition = .imageOnly
         statusItem.button?.image = logoImage()
         statusItem.button?.toolTip = "GazeBreak"
         statusItem.button?.action = #selector(togglePopover(_:))
         statusItem.button?.target = self
+        installStatusItemHoverTracking()
 
         popover = NSPopover()
         popover.behavior = .transient
@@ -58,6 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ]
         model.start()
         updateStatusItem()
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        // Keep the menu-bar UI from lingering after the user clicks into another app.
+        popover?.performClose(nil)
     }
 
     private func runSelfTest() {
@@ -109,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     deinit {
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         workspaceObservers.forEach { workspaceCenter.removeObserver($0) }
+        mouseTrackingMonitors.forEach { NSEvent.removeMonitor($0) }
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -119,8 +128,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
-        button.title = "  \(model.displayTime)"
+        button.title = isStatusItemHovered ? "  \(model.displayTime)" : ""
+        button.imagePosition = isStatusItemHovered ? .imageLeading : .imageOnly
+        button.toolTip = "Next break in \(model.displayTime)"
         button.contentTintColor = model.isPaused ? .secondaryLabelColor : .labelColor
+    }
+
+    private func installStatusItemHoverTracking() {
+        let localMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            self?.updateStatusItemHover()
+            return event
+        }
+        let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+            self?.updateStatusItemHover()
+        }
+        if let localMonitor { mouseTrackingMonitors.append(localMonitor) }
+        if let globalMonitor { mouseTrackingMonitors.append(globalMonitor) }
+    }
+
+    private func updateStatusItemHover() {
+        guard let button = statusItem?.button, let window = button.window else { return }
+        let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
+        let hovered = buttonFrame.contains(NSEvent.mouseLocation)
+        guard hovered != isStatusItemHovered else { return }
+        isStatusItemHovered = hovered
+        updateStatusItem()
     }
 
     private func showReminder() {

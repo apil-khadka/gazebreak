@@ -63,7 +63,7 @@ For an experimental self-signed build, push a tag such as `self-v0.1.1`. The sel
 
 For a deterministic timer smoke test, run `swift run GazeBreak --self-test`. It exercises countdown advancement, the reminder boundary, and break completion without waiting 20 minutes.
 
-The app is an accessory app, so it stays out of the Dock and lives in the menu bar. Click the eye and timer pill to pause, reset, change the interval, or change the break length.
+The app is an accessory app, so it stays out of the Dock and lives in the menu bar. The menu-bar item shows only the eye icon until hovered, then briefly reveals the countdown. Click it to open the controls; clicking elsewhere closes the menu.
 
 The default timing is a 20-minute focus interval followed by a 30-second distance break. The reminder window is a floating panel that stays visible above other windows and across Spaces. Settings persist between launches, and the timer pauses when the macOS session becomes inactive.
 
