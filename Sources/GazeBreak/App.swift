@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 320, height: 420)
+        popover.contentSize = NSSize(width: 320, height: 475)
         popover.contentViewController = NSHostingController(rootView: MenuView(model: model))
 
         model.onTick = { [weak self] in self?.updateStatusItem() }
@@ -195,6 +195,12 @@ final class GazeBreakModel: ObservableObject {
     @Published var remindersEnabled: Bool {
         didSet { UserDefaults.standard.set(remindersEnabled, forKey: Defaults.remindersEnabled) }
     }
+    @Published var soundEnabled: Bool {
+        didSet { UserDefaults.standard.set(soundEnabled, forKey: Defaults.soundEnabled) }
+    }
+    @Published var breakSoundName: String {
+        didSet { UserDefaults.standard.set(breakSoundName, forKey: Defaults.breakSoundName) }
+    }
     var onTick: (() -> Void)?
     var onReminder: (() -> Void)?
     private var timer: Timer?
@@ -207,6 +213,8 @@ final class GazeBreakModel: ObservableObject {
         static let intervalMinutes = "intervalMinutes"
         static let breakSeconds = "breakSeconds"
         static let remindersEnabled = "remindersEnabled"
+        static let soundEnabled = "soundEnabled"
+        static let breakSoundName = "breakSoundName"
     }
 
     init() {
@@ -214,6 +222,8 @@ final class GazeBreakModel: ObservableObject {
         intervalMinutes = savedInterval
         breakSeconds = UserDefaults.standard.object(forKey: Defaults.breakSeconds) as? Int ?? 30
         remindersEnabled = UserDefaults.standard.object(forKey: Defaults.remindersEnabled) as? Bool ?? true
+        soundEnabled = UserDefaults.standard.object(forKey: Defaults.soundEnabled) as? Bool ?? true
+        breakSoundName = UserDefaults.standard.string(forKey: Defaults.breakSoundName) ?? BreakSound.pop.rawValue
         secondsRemaining = savedInterval * 60
     }
 
@@ -288,6 +298,16 @@ final class GazeBreakModel: ObservableObject {
     }
 }
 
+private enum BreakSound: String, CaseIterable, Identifiable {
+    case pop = "Pop"
+    case tink = "Tink"
+    case ping = "Ping"
+    case glass = "Glass"
+    case bottle = "Bottle"
+
+    var id: String { rawValue }
+}
+
 struct MenuView: View {
     @ObservedObject var model: GazeBreakModel
 
@@ -336,6 +356,26 @@ struct MenuView: View {
             }.font(.callout).padding(.top, 10)
             Toggle("Enable reminders", isOn: $model.remindersEnabled).toggleStyle(.switch).font(.callout).padding(.top, 18)
             HStack {
+                Toggle("Sound at break end", isOn: $model.soundEnabled).toggleStyle(.switch).font(.callout)
+                Spacer()
+                Button("Test") {
+                    playBreakCompletionSound(named: model.breakSoundName, enabled: model.soundEnabled)
+                }
+                .buttonStyle(.bordered)
+            }
+            HStack {
+                Text("Sound").font(.callout)
+                Spacer()
+                Picker("Sound", selection: $model.breakSoundName) {
+                    ForEach(BreakSound.allCases) { sound in
+                        Text(sound.rawValue).tag(sound.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 95)
+            }
+            .padding(.top, 10)
+            HStack {
                 Spacer()
                 Button("Quit GazeBreak") { NSApp.terminate(nil) }
                     .buttonStyle(.link).font(.caption).foregroundStyle(.secondary)
@@ -369,7 +409,7 @@ struct ReminderView: View {
             if remaining > 0 {
                 remaining -= 1
             } else {
-                playBreakCompletionSound()
+                playBreakCompletionSound(named: model.breakSoundName, enabled: model.soundEnabled)
                 dismiss()
                 model.reset()
             }
@@ -377,8 +417,9 @@ struct ReminderView: View {
     }
 }
 
-private func playBreakCompletionSound() {
-    if let sound = NSSound(named: NSSound.Name("Pop")) {
+private func playBreakCompletionSound(named name: String, enabled: Bool) {
+    guard enabled else { return }
+    if let sound = NSSound(named: NSSound.Name(name)) {
         sound.volume = 0.35
         sound.play()
     } else {
