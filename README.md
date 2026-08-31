@@ -8,11 +8,29 @@ GazeBreak is named for the small, intentional pause it creates in a long period 
 
 GazeBreak is licensed under the [Apache License 2.0](LICENSE).
 
-## Download
+## Install with Homebrew
 
-Download the latest production build from the [GitHub Releases page](https://github.com/apil-khadka/gazebreak/releases/latest). Production releases are distributed as `GazeBreak-macOS-universal.zip` for both Apple Silicon (`arm64`) and Intel (`x86_64`) Macs.
+The easiest way to install GazeBreak is through the personal Homebrew tap:
 
-The current `v0.1.0` artifact predates the production release workflow and is arm64-only, ad-hoc signed, and not notarized. Do not use it as a Homebrew cask source. Releases produced from the version-tag workflow are signed with a Developer ID Application certificate, notarized by Apple, stapled, and support macOS 13 or later.
+```bash
+brew tap apil-khadka/tap
+brew install --cask gazebreak
+```
+
+To update it later:
+
+```bash
+brew update
+brew upgrade --cask gazebreak
+```
+
+To uninstall:
+
+```bash
+brew uninstall --cask gazebreak
+```
+
+The tap currently serves the stable Apple Silicon (`arm64`) cask. Intel support will be available when the tap moves to the stable universal release. For manual downloads, use the [GitHub Releases page](https://github.com/apil-khadka/gazebreak/releases).
 
 ## Build a release locally
 
