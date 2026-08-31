@@ -197,7 +197,7 @@ final class GazeBreakModel: ObservableObject {
     func start() {
         timer?.invalidate()
         let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+            Task { @MainActor [weak self] in self?.tick() }
         }
         timer = newTimer
         RunLoop.main.add(newTimer, forMode: .common)
