@@ -43,6 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           APP_VERSION="$RELEASE_VERSION" ./scripts/package-release.sh
+          shasum -a 256 dist/GazeBreak-macOS-universal.zip > dist/GazeBreak-macOS-universal.zip.sha256
 
       - name: Verify self-signed artifact
         run: |
