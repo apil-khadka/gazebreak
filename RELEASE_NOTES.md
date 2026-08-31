@@ -23,3 +23,5 @@ GazeBreak is a reminder tool, not medical advice or a treatment for eye conditio
 The `v0.1.0` artifact is a legacy arm64 build with ad-hoc signing and no Apple notarization. It is not suitable for Homebrew distribution.
 
 Version-tagged production releases use `GazeBreak-macOS-universal.zip`, containing a universal `arm64` + `x86_64` app for macOS 13 or later. The release workflow signs the app with a Developer ID Application certificate, submits it to Apple with `xcrun notarytool`, staples the ticket, and verifies it with `codesign`, `spctl`, and `xcrun stapler` before publishing the ZIP and its SHA-256 checksum.
+
+An explicitly tagged `self-v*` prerelease is available for development testing when Apple credentials are unavailable. It is ad-hoc signed only, is not notarized or Gatekeeper-trusted, and must not be treated as a production release.

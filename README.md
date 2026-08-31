@@ -35,6 +35,8 @@ Push a semantic version tag such as `v0.1.1` to run `.github/workflows/release.y
 
 The published `GazeBreak-macOS-universal.zip` contains only `GazeBreak.app`; its adjacent `.sha256` file contains the checksum used by a Homebrew cask.
 
+For an experimental self-signed build, push a tag such as `self-v0.1.1`. The self-signed workflow publishes a prerelease with the same universal filename and checksum, but it is ad-hoc signed, not notarized, and not trusted by Gatekeeper. It is not suitable for a normal end-user Homebrew cask.
+
 ## Run
 
 1. Open the folder in Xcode.

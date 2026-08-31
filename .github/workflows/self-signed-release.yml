@@ -1,0 +1,72 @@
+name: Self-signed experimental release
+
+on:
+  push:
+    tags:
+      - "self-v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing self-v version tag, for example self-v0.1.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gazebreak-self-signed-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate release input
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^self-v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "Self-signed tag must look like self-v0.1.1" >&2; exit 1; }
+          echo "RELEASE_VERSION=${RELEASE_TAG#self-v}" >> "$GITHUB_ENV"
+
+      - name: Build universal ad-hoc signed app
+        run: |
+          set -euo pipefail
+          APP_VERSION="$RELEASE_VERSION" ./scripts/package-release.sh
+
+      - name: Verify self-signed artifact
+        run: |
+          set -euo pipefail
+          app="dist/GazeBreak.app"
+          lipo -info "$app/Contents/MacOS/GazeBreak"
+          codesign --verify --deep --strict --verbose=4 "$app"
+          swift run -c release GazeBreak --self-test
+          if spctl --assess --type execute --verbose=4 "$app"; then
+            echo "Unexpected Gatekeeper acceptance for an ad-hoc signed build" >&2
+            exit 1
+          else
+            echo "Gatekeeper correctly rejects the self-signed development build"
+          fi
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            "dist/GazeBreak-macOS-universal.zip" \
+            "dist/GazeBreak-macOS-universal.zip.sha256" \
+            --verify-tag \
+            --prerelease \
+            --title "GazeBreak $RELEASE_VERSION (self-signed experimental)" \
+            --notes "Universal arm64 + x86_64 ad-hoc signed development build for macOS 13+. Not notarized and not Gatekeeper-trusted. Use only for testing."
