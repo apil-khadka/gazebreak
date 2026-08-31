@@ -10,7 +10,7 @@ GazeBreak is licensed under the [Apache License 2.0](LICENSE).
 
 ## Install with Homebrew
 
-The easiest way to install GazeBreak is through the personal Homebrew tap:
+The easiest way to install GazeBreak is through [Homebrew](https://brew.sh/) and the [GazeBreak tap](https://github.com/apil-khadka/homebrew-tap). The tap’s [cask definition](https://github.com/apil-khadka/homebrew-tap/blob/main/Casks/gazebreak.rb) installs the app into Applications:
 
 ```bash
 brew tap apil-khadka/tap

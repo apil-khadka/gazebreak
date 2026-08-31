@@ -56,13 +56,13 @@
       <div class="install-grid">
         <div>
           <h2 id="install-title">Ready in two commands.</h2>
-          <p>Homebrew puts GazeBreak in your Applications folder and keeps the install easy to update.</p>
-          <p class="install-small">The current tap serves the stable Apple Silicon build. Intel support arrives with the stable universal cask.</p>
+          <p>Install <a href="https://brew.sh/">Homebrew</a> first if you do not already have it. Then add the <a href="https://github.com/apil-khadka/homebrew-tap">GazeBreak tap</a> and install the <a href="https://github.com/apil-khadka/homebrew-tap/blob/main/Casks/gazebreak.rb">cask</a>.</p>
+          <p class="install-small">The current tap serves the stable Apple Silicon build. Intel support arrives with the stable universal cask. <a href="https://github.com/apil-khadka/gazebreak/releases">View releases</a> for manual downloads.</p>
         </div>
         <div class="terminal" role="group" aria-label="Homebrew installation commands">
-          <div class="terminal-bar"><span></span><span></span><span></span><b>Terminal</b></div>
-          <div class="command"><span class="prompt">$</span><code>brew tap apil-khadka/tap</code></div>
-          <div class="command"><span class="prompt">$</span><code>brew install --cask gazebreak</code></div>
+          <div class="terminal-bar"><span></span><span></span><span></span><b>Terminal</b><span class="terminal-label">macOS</span></div>
+          <div class="command"><span class="prompt">$</span><code>brew tap apil-khadka/tap</code><button class="copy-button" type="button" data-copy="brew tap apil-khadka/tap">Copy</button></div>
+          <div class="command"><span class="prompt">$</span><code>brew install --cask gazebreak</code><button class="copy-button" type="button" data-copy="brew install --cask gazebreak">Copy</button></div>
           <div class="terminal-note">Then open GazeBreak from Applications.</div>
         </div>
       </div>
@@ -75,9 +75,9 @@
         <p>A practical cadence for close-focus work, kept visible enough to help and quiet enough to ignore.</p>
       </div>
       <div class="rhythm-grid">
-        <article class="stat-card stat-coral"><strong>20</strong><span>minutes of focused work</span></article>
-        <article class="stat-card stat-lime"><strong>30</strong><span>seconds looking away</span></article>
-        <article class="stat-card stat-lilac"><strong>15</strong><span>minutes for a longer reset after two hours</span></article>
+        <article class="stat-card stat-ochre"><strong>20</strong><span>minutes of focused work</span></article>
+        <article class="stat-card stat-sand"><strong>30</strong><span>seconds looking away</span></article>
+        <article class="stat-card stat-paper"><strong>15</strong><span>minutes for a longer reset after two hours</span></article>
       </div>
     </section>
 
@@ -106,5 +106,23 @@
     <span>GazeBreak · a gentle reminder tool</span>
     <div><a href="https://github.com/apil-khadka/gazebreak">GitHub</a><a href="https://github.com/apil-khadka/gazebreak/blob/main/LICENSE">Apache 2.0</a><span>Not medical advice.</span></div>
   </footer>
+  <script>
+  document.querySelectorAll("[data-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const original = button.textContent;
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy);
+        button.textContent = "Copied";
+        button.classList.add("is-copied");
+      } catch {
+        button.textContent = "Select + copy";
+      }
+      window.setTimeout(() => {
+        button.textContent = original;
+        button.classList.remove("is-copied");
+      }, 1800);
+    });
+  });
+  </script>
 </body>
 </html>
