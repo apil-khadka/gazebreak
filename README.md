@@ -10,7 +10,9 @@ GazeBreak is licensed under the [Apache License 2.0](LICENSE).
 
 ## Download
 
-Download the latest Apple Silicon build from the [GitHub Releases page](https://github.com/apil-khadka/gazebreak/releases/latest). The release is distributed as `GazeBreak-macOS-arm64.zip`.
+Download the latest production build from the [GitHub Releases page](https://github.com/apil-khadka/gazebreak/releases/latest). Production releases are distributed as `GazeBreak-macOS-universal.zip` for both Apple Silicon (`arm64`) and Intel (`x86_64`) Macs.
+
+The current `v0.1.0` artifact predates the production release workflow and is arm64-only, ad-hoc signed, and not notarized. Do not use it as a Homebrew cask source. Releases produced from the version-tag workflow are signed with a Developer ID Application certificate, notarized by Apple, stapled, and support macOS 13 or later.
 
 ## Build a release locally
 
@@ -18,7 +20,20 @@ Download the latest Apple Silicon build from the [GitHub Releases page](https://
 ./scripts/package-release.sh
 ```
 
-This creates `dist/GazeBreak.app` and `dist/GazeBreak-macOS-arm64.zip`.
+This creates a universal `dist/GazeBreak.app` and `dist/GazeBreak-macOS-universal.zip`. Local builds use ad-hoc signing unless `SIGNING_IDENTITY` is provided. The production GitHub Actions workflow supplies the Developer ID certificate and App Store Connect API key through GitHub Secrets, then notarizes and staples the app before publishing.
+
+## Production releases
+
+Push a semantic version tag such as `v0.1.1` to run `.github/workflows/release.yml`. The workflow requires these repository secrets and never stores their values in the repository:
+
+- `DEVELOPER_ID_APPLICATION_P12_BASE64`
+- `DEVELOPER_ID_APPLICATION_P12_PASSWORD`
+- `APPLE_API_KEY_P8_BASE64`
+- `APPLE_API_KEY_ID`
+- `APPLE_API_ISSUER_ID`
+- `APPLE_TEAM_ID`
+
+The published `GazeBreak-macOS-universal.zip` contains only `GazeBreak.app`; its adjacent `.sha256` file contains the checksum used by a Homebrew cask.
 
 ## Run
 

@@ -1,0 +1,193 @@
+name: Release GazeBreak
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag to build and release, for example v0.1.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gazebreak-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate release input
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "Release tag must be a semantic version beginning with v" >&2; exit 1; }
+          echo "RELEASE_VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${CERTIFICATE_BASE64:?Missing DEVELOPER_ID_APPLICATION_P12_BASE64 secret}"
+          : "${CERTIFICATE_PASSWORD:?Missing DEVELOPER_ID_APPLICATION_P12_PASSWORD secret}"
+
+          keychain_path="$RUNNER_TEMP/gazebreak-build.keychain-db"
+          keychain_password="$(openssl rand -hex 32)"
+          certificate_path="$RUNNER_TEMP/developer-id-application.p12"
+          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security \
+            -T /usr/bin/productbuild
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path" >/dev/null
+          security list-keychains -d user -s "$keychain_path"
+          security default-keychain -s "$keychain_path"
+
+          signing_identity="$(security find-identity -v -p codesigning "$keychain_path" \
+            | sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' \
+            | head -n 1)"
+          [[ -n "$signing_identity" ]] \
+            || { echo "No Developer ID Application identity found in imported keychain" >&2; exit 1; }
+
+          echo "KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
+          echo "SIGNING_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
+          echo "CERTIFICATE_PATH=$certificate_path" >> "$GITHUB_ENV"
+
+      - name: Prepare App Store Connect API key
+        env:
+          API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        run: |
+          set -euo pipefail
+          : "${API_KEY_BASE64:?Missing APPLE_API_KEY_P8_BASE64 secret}"
+          : "${API_KEY_ID:?Missing APPLE_API_KEY_ID secret}"
+          api_key_path="$RUNNER_TEMP/AuthKey_${API_KEY_ID}.p8"
+          printf '%s' "$API_KEY_BASE64" | base64 --decode > "$api_key_path"
+          chmod 600 "$api_key_path"
+          echo "APPLE_API_KEY_PATH=$api_key_path" >> "$GITHUB_ENV"
+
+      - name: Build universal signed app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID secret}"
+          APP_VERSION="$RELEASE_VERSION" \
+          REQUIRE_SIGNING=1 \
+          SIGNING_IDENTITY="$SIGNING_IDENTITY" \
+          KEYCHAIN_PATH="$KEYCHAIN_PATH" \
+          ./scripts/package-release.sh
+
+      - name: Verify signed universal app
+        run: |
+          set -euo pipefail
+          app="dist/GazeBreak.app"
+          binary="$app/Contents/MacOS/GazeBreak"
+          lipo -info "$binary"
+          codesign --verify --deep --strict --verbose=4 "$app"
+          codesign --display --verbose=4 "$app"
+          plutil -p "$app/Contents/Info.plist"
+
+      - name: Submit app for notarization
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          : "${APPLE_API_KEY_ID:?Missing APPLE_API_KEY_ID secret}"
+          : "${APPLE_API_ISSUER_ID:?Missing APPLE_API_ISSUER_ID secret}"
+          : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID secret}"
+          (cd dist && /usr/bin/zip -qry GazeBreak-notarization-input.zip GazeBreak.app -x '*/.DS_Store' '__MACOSX/*')
+          xcrun notarytool submit dist/GazeBreak-notarization-input.zip \
+            --key "$APPLE_API_KEY_PATH" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+      - name: Staple and validate notarization
+        run: |
+          set -euo pipefail
+          app="dist/GazeBreak.app"
+          xcrun stapler staple -v "$app"
+          xcrun stapler validate -v "$app"
+          spctl --assess --type execute --verbose=4 "$app"
+          codesign --verify --deep --strict --verbose=4 "$app"
+
+      - name: Create clean release ZIP and checksum
+        id: artifact
+        run: |
+          set -euo pipefail
+          zip_name="GazeBreak-macOS-universal.zip"
+          zip_path="dist/$zip_name"
+          rm -f "$zip_path" "${zip_path}.sha256"
+          (cd dist && /usr/bin/zip -qry "$zip_name" GazeBreak.app -x '*/.DS_Store' '__MACOSX/*')
+          if ! unzip -Z1 "$zip_path" | awk '/^__MACOSX\// {bad=1} END {exit bad}'; then
+            echo "release ZIP contains __MACOSX" >&2
+            exit 1
+          fi
+          if ! unzip -Z1 "$zip_path" | awk '!/^GazeBreak\.app(\/|$)/ {bad=1} END {exit bad}'; then
+            echo "release ZIP contains files outside GazeBreak.app" >&2
+            exit 1
+          fi
+          (cd dist && shasum -a 256 "$zip_name" > "${zip_name}.sha256")
+          checksum="$(awk '{print $1}' "${zip_path}.sha256")"
+          echo "zip_name=$zip_name" >> "$GITHUB_OUTPUT"
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+          echo "SHA-256: $checksum"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP_NAME: ${{ steps.artifact.outputs.zip_name }}
+        run: |
+          set -euo pipefail
+          notes="Universal arm64 + x86_64 build for macOS 13 and later. Signed with Developer ID Application, notarized by Apple, and stapled."
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "dist/$ZIP_NAME" \
+              "dist/$ZIP_NAME.sha256" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "dist/$ZIP_NAME" \
+              "dist/$ZIP_NAME.sha256" \
+              --verify-tag \
+              --title "GazeBreak $RELEASE_VERSION" \
+              --notes "$notes"
+          fi
+
+      - name: Remove temporary signing material
+        if: ${{ always() }}
+        run: |
+          set +e
+          [[ -n "${KEYCHAIN_PATH:-}" ]] && security delete-keychain "$KEYCHAIN_PATH"
+          rm -f "${CERTIFICATE_PATH:-}" "${APPLE_API_KEY_PATH:-}"
