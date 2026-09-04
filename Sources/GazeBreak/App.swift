@@ -2,11 +2,15 @@ import AppKit
 import SwiftUI
 
 @main
-struct GazeBreakApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
-    var body: some Scene {
-        Settings { EmptyView() }
+@MainActor
+struct GazeBreakMain {
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        withExtendedLifetime(delegate) {
+            app.run()
+        }
     }
 }
 
@@ -39,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 320, height: 475)
+        popover.contentSize = NSSize(width: 320, height: 520)
         popover.contentViewController = NSHostingController(rootView: MenuView(model: model))
 
         model.onTick = { [weak self] in self?.updateStatusItem() }
@@ -73,17 +77,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let savedInterval = defaults.object(forKey: "intervalMinutes")
         let savedBreak = defaults.object(forKey: "breakSeconds")
         let savedEnabled = defaults.object(forKey: "remindersEnabled")
+        let savedSoundEnabled = defaults.object(forKey: "soundEnabled")
+        let savedSoundName = defaults.object(forKey: "breakSoundName")
+        let savedSoundVolume = defaults.object(forKey: "soundVolume")
         var passed = false
         defer {
             restoreDefault(savedInterval, key: "intervalMinutes")
             restoreDefault(savedBreak, key: "breakSeconds")
             restoreDefault(savedEnabled, key: "remindersEnabled")
+            restoreDefault(savedSoundEnabled, key: "soundEnabled")
+            restoreDefault(savedSoundName, key: "breakSoundName")
+            restoreDefault(savedSoundVolume, key: "soundVolume")
             if passed { print("GazeBreak self-test passed") }
             NSApp.terminate(nil)
         }
 
         model.remindersEnabled = true
         model.updateInterval(1)
+        model.soundVolume = 0.65
+        let reloadedModel = GazeBreakModel()
+        precondition(abs(reloadedModel.soundVolume - 0.65) < 0.001, "sound volume did not persist")
         model.setCountdownForTesting(2)
         var reminderFired = false
         model.onReminder = { reminderFired = true }
@@ -98,6 +111,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.finishCurrentBreak()
         precondition(model.secondsRemaining == 60, "break completion did not reset interval")
         precondition(!model.isPaused, "break completion left model paused")
+
+        var breakRemaining = 1
+        let completedOnFinalSecond = advanceBreakCountdown(&breakRemaining)
+        precondition(completedOnFinalSecond && breakRemaining == 0, "break countdown completed late")
+
+        model.setFocusSecondsForTesting(2 * 60 * 60 - 1)
+        model.setCountdownForTesting(1)
+        model.advanceOneSecondForTesting()
+        precondition(model.isLongBreak, "long break did not start at the focus threshold")
+        model.finishCurrentBreak()
+        model.setCountdownForTesting(1)
+        model.advanceOneSecondForTesting()
+        precondition(!model.isLongBreak, "long break did not start a fresh focus cycle")
         passed = true
     }
 
@@ -201,6 +227,9 @@ final class GazeBreakModel: ObservableObject {
     @Published var breakSoundName: String {
         didSet { UserDefaults.standard.set(breakSoundName, forKey: Defaults.breakSoundName) }
     }
+    @Published var soundVolume: Double {
+        didSet { UserDefaults.standard.set(soundVolume, forKey: Defaults.soundVolume) }
+    }
     var onTick: (() -> Void)?
     var onReminder: (() -> Void)?
     private var timer: Timer?
@@ -215,15 +244,18 @@ final class GazeBreakModel: ObservableObject {
         static let remindersEnabled = "remindersEnabled"
         static let soundEnabled = "soundEnabled"
         static let breakSoundName = "breakSoundName"
+        static let soundVolume = "soundVolume"
     }
 
     init() {
-        let savedInterval = UserDefaults.standard.object(forKey: Defaults.intervalMinutes) as? Int ?? 20
+        let savedInterval = min(max(UserDefaults.standard.object(forKey: Defaults.intervalMinutes) as? Int ?? 20, 1), 240)
         intervalMinutes = savedInterval
-        breakSeconds = UserDefaults.standard.object(forKey: Defaults.breakSeconds) as? Int ?? 30
+        breakSeconds = min(max(UserDefaults.standard.object(forKey: Defaults.breakSeconds) as? Int ?? 30, 5), 300)
         remindersEnabled = UserDefaults.standard.object(forKey: Defaults.remindersEnabled) as? Bool ?? true
         soundEnabled = UserDefaults.standard.object(forKey: Defaults.soundEnabled) as? Bool ?? true
-        breakSoundName = UserDefaults.standard.string(forKey: Defaults.breakSoundName) ?? BreakSound.pop.rawValue
+        let savedSoundName = UserDefaults.standard.string(forKey: Defaults.breakSoundName) ?? BreakSound.pop.rawValue
+        breakSoundName = BreakSound(rawValue: savedSoundName)?.rawValue ?? BreakSound.pop.rawValue
+        soundVolume = min(max(UserDefaults.standard.object(forKey: Defaults.soundVolume) as? Double ?? 0.35, 0), 1)
         secondsRemaining = savedInterval * 60
     }
 
@@ -253,7 +285,11 @@ final class GazeBreakModel: ObservableObject {
     }
 
     func finishCurrentBreak() {
+        let completedLongBreak = isLongBreak
         isLongBreak = false
+        if completedLongBreak {
+            focusSeconds = 0
+        }
         secondsRemaining = intervalMinutes * 60
         isPaused = false
         onTick?()
@@ -263,6 +299,8 @@ final class GazeBreakModel: ObservableObject {
     func advanceOneSecondForTesting() { tick() }
 
     func setCountdownForTesting(_ seconds: Int) { secondsRemaining = max(0, seconds) }
+
+    func setFocusSecondsForTesting(_ seconds: Int) { focusSeconds = max(0, seconds) }
 
     func pauseForSystem() {
         guard !isPaused else { return }
@@ -296,6 +334,16 @@ final class GazeBreakModel: ObservableObject {
         }
         onTick?()
     }
+}
+
+@discardableResult
+fileprivate func advanceBreakCountdown(_ remaining: inout Int) -> Bool {
+    if remaining > 1 {
+        remaining -= 1
+        return false
+    }
+    remaining = 0
+    return true
 }
 
 private enum BreakSound: String, CaseIterable, Identifiable {
@@ -359,9 +407,10 @@ struct MenuView: View {
                 Toggle("Sound at break end", isOn: $model.soundEnabled).toggleStyle(.switch).font(.callout)
                 Spacer()
                 Button("Test") {
-                    playBreakCompletionSound(named: model.breakSoundName, enabled: model.soundEnabled)
+                    playBreakCompletionSound(named: model.breakSoundName, enabled: model.soundEnabled, volume: model.soundVolume)
                 }
                 .buttonStyle(.bordered)
+                .disabled(!model.soundEnabled)
             }
             HStack {
                 Text("Sound").font(.callout)
@@ -375,6 +424,19 @@ struct MenuView: View {
                 .frame(width: 95)
             }
             .padding(.top, 10)
+            HStack(spacing: 8) {
+                Image(systemName: "speaker.wave.1.fill")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Slider(value: $model.soundVolume, in: 0...1, step: 0.05)
+                    .accessibilityLabel("Sound volume")
+                Text("\(Int(model.soundVolume * 100))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 34, alignment: .trailing)
+            }
+            .padding(.top, 8)
+            .disabled(!model.soundEnabled)
             HStack {
                 Spacer()
                 Button("Quit GazeBreak") { NSApp.terminate(nil) }
@@ -406,23 +468,21 @@ struct ReminderView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
         .onAppear { remaining = model.currentBreakSeconds }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            if remaining > 0 {
-                remaining -= 1
-            } else {
-                playBreakCompletionSound(named: model.breakSoundName, enabled: model.soundEnabled)
+            if advanceBreakCountdown(&remaining) {
+                playBreakCompletionSound(named: model.breakSoundName, enabled: model.soundEnabled, volume: model.soundVolume)
                 dismiss()
-                model.reset()
+                model.finishCurrentBreak()
             }
         }
     }
 }
 
-private func playBreakCompletionSound(named name: String, enabled: Bool) {
+private func playBreakCompletionSound(named name: String, enabled: Bool, volume: Double) {
     guard enabled else { return }
-    if let sound = NSSound(named: NSSound.Name(name)) {
-        sound.volume = 0.35
+    let sound = NSSound(named: NSSound.Name(name))
+        ?? NSSound(named: NSSound.Name(BreakSound.pop.rawValue))
+    if let sound {
+        sound.volume = Float(min(max(volume, 0), 1))
         sound.play()
-    } else {
-        NSSound.beep()
     }
 }

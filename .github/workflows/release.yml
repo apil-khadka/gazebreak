@@ -114,6 +114,7 @@ jobs:
           codesign --verify --deep --strict --verbose=4 "$app"
           codesign --display --verbose=4 "$app"
           plutil -p "$app/Contents/Info.plist"
+          swift run -c release GazeBreak --self-test
 
       - name: Submit app for notarization
         env:

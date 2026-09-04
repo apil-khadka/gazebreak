@@ -64,10 +64,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "$RELEASE_TAG" \
-            "dist/GazeBreak-macOS-universal.zip" \
-            "dist/GazeBreak-macOS-universal.zip.sha256" \
-            --verify-tag \
-            --prerelease \
-            --title "GazeBreak $RELEASE_VERSION (self-signed experimental)" \
-            --notes "Universal arm64 + x86_64 ad-hoc signed development build for macOS 13+. Not notarized and not Gatekeeper-trusted. Use only for testing."
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "dist/GazeBreak-macOS-universal.zip" \
+              "dist/GazeBreak-macOS-universal.zip.sha256" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "dist/GazeBreak-macOS-universal.zip" \
+              "dist/GazeBreak-macOS-universal.zip.sha256" \
+              --verify-tag \
+              --prerelease \
+              --title "GazeBreak $RELEASE_VERSION (self-signed experimental)" \
+              --notes "Universal arm64 + x86_64 ad-hoc signed development build for macOS 13+. Not notarized and not Gatekeeper-trusted. Use only for testing."
+          fi

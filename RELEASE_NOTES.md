@@ -1,3 +1,14 @@
+# GazeBreak 0.1.5
+
+## Included
+
+- Fix break completion timing so the sound and reset happen on the final second
+- Start a fresh focus cycle after completing a long reset
+- Add persistent sound selection and volume controls
+- Keep the app menu-bar-only without opening an empty settings window at launch
+- Run the timer self-test in CI and release verification
+- Make self-signed release reruns replace existing assets safely
+
 # GazeBreak 0.1.0
 
 The first public release of GazeBreak, a quiet macOS menu-bar companion for regular screen breaks.
