@@ -1,5 +1,7 @@
 # Unreleased
 
+# GazeBreak 0.1.6
+
 - Remove the two-hour/15-minute reset cycle; every reminder uses the configured short break
 - Use deadline scheduling instead of second-by-second background updates
 - Release the controls when closed and replace global mouse monitoring with icon hover tracking
