@@ -1,10 +1,15 @@
 import AppKit
 import SwiftUI
+import Combine
 
 @main
 @MainActor
 struct GazeBreakMain {
     static func main() {
+        if CommandLine.arguments.contains("--self-test") {
+            GazeBreakSelfTest.run()
+            return
+        }
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
@@ -15,27 +20,28 @@ struct GazeBreakMain {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private let model = GazeBreakModel()
     private var reminderWindow: NSWindow?
     private var workspaceObservers: [NSObjectProtocol] = []
-    private var mouseTrackingMonitors: [Any] = []
+    private var statusHoverObserver: StatusHoverObserver?
     private var isStatusItemHovered = false
+    private lazy var dismissalMonitor = PopoverDismissalMonitor(
+        target: { [weak self] event in self?.popoverEventTarget(event) ?? .outside },
+        close: { [weak self] in self?.popover.performClose(nil) }
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        if CommandLine.arguments.contains("--self-test") {
-            runSelfTest()
-            return
-        }
-
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         statusItem.button?.imagePosition = .imageOnly
-        statusItem.button?.image = logoImage()
+        let icon = NSImage(systemSymbolName: "eye", accessibilityDescription: "GazeBreak")
+        icon?.isTemplate = true
+        statusItem.button?.image = icon
         statusItem.button?.toolTip = "GazeBreak"
         statusItem.button?.action = #selector(togglePopover(_:))
         statusItem.button?.target = self
@@ -43,24 +49,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 320, height: 520)
-        popover.contentViewController = NSHostingController(rootView: MenuView(model: model))
+        popover.delegate = self
+        // Create the SwiftUI tree only while the menu is open.
 
         model.onTick = { [weak self] in self?.updateStatusItem() }
         model.onReminder = { [weak self] in self?.showReminder() }
+        model.onBreakDismissed = { [weak self] in self?.dismissReminder() }
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         workspaceObservers = [
             workspaceCenter.addObserver(forName: NSWorkspace.sessionDidResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.model.pauseForSystem() }
+                Task { @MainActor [weak self] in self?.model.pauseForSystem(.session) }
             },
             workspaceCenter.addObserver(forName: NSWorkspace.sessionDidBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.model.resumeFromSystem() }
+                Task { @MainActor [weak self] in self?.model.resumeFromSystem(.session) }
             },
             workspaceCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.model.pauseForSystem() }
+                Task { @MainActor [weak self] in self?.model.pauseForSystem(.display) }
             },
             workspaceCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.model.resumeFromSystem() }
+                Task { @MainActor [weak self] in self?.model.resumeFromSystem(.display) }
             }
         ]
         model.start()
@@ -72,120 +79,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover?.performClose(nil)
     }
 
-    private func runSelfTest() {
-        let defaults = UserDefaults.standard
-        let savedInterval = defaults.object(forKey: "intervalMinutes")
-        let savedBreak = defaults.object(forKey: "breakSeconds")
-        let savedEnabled = defaults.object(forKey: "remindersEnabled")
-        let savedSoundEnabled = defaults.object(forKey: "soundEnabled")
-        let savedSoundName = defaults.object(forKey: "breakSoundName")
-        let savedSoundVolume = defaults.object(forKey: "soundVolume")
-        var passed = false
-        defer {
-            restoreDefault(savedInterval, key: "intervalMinutes")
-            restoreDefault(savedBreak, key: "breakSeconds")
-            restoreDefault(savedEnabled, key: "remindersEnabled")
-            restoreDefault(savedSoundEnabled, key: "soundEnabled")
-            restoreDefault(savedSoundName, key: "breakSoundName")
-            restoreDefault(savedSoundVolume, key: "soundVolume")
-            if passed { print("GazeBreak self-test passed") }
-            NSApp.terminate(nil)
-        }
-
-        model.remindersEnabled = true
-        model.updateInterval(1)
-        model.soundVolume = 0.65
-        let reloadedModel = GazeBreakModel()
-        precondition(abs(reloadedModel.soundVolume - 0.65) < 0.001, "sound volume did not persist")
-        model.setCountdownForTesting(2)
-        var reminderFired = false
-        model.onReminder = { reminderFired = true }
-
-        model.advanceOneSecondForTesting()
-        precondition(model.secondsRemaining == 1, "countdown did not advance")
-        model.advanceOneSecondForTesting()
-        precondition(model.secondsRemaining == 0, "countdown did not reach zero")
-        precondition(model.isPaused, "model did not pause at the reminder")
-        precondition(reminderFired, "reminder callback did not fire")
-
-        model.finishCurrentBreak()
-        precondition(model.secondsRemaining == 60, "break completion did not reset interval")
-        precondition(!model.isPaused, "break completion left model paused")
-
-        var breakRemaining = 1
-        let completedOnFinalSecond = advanceBreakCountdown(&breakRemaining)
-        precondition(completedOnFinalSecond && breakRemaining == 0, "break countdown completed late")
-
-        model.setFocusSecondsForTesting(2 * 60 * 60 - 1)
-        model.setCountdownForTesting(1)
-        model.advanceOneSecondForTesting()
-        precondition(model.isLongBreak, "long break did not start at the focus threshold")
-        model.finishCurrentBreak()
-        model.setCountdownForTesting(1)
-        model.advanceOneSecondForTesting()
-        precondition(!model.isLongBreak, "long break did not start a fresh focus cycle")
-        passed = true
-    }
-
-    private func restoreDefault(_ value: Any?, key: String) {
-        if let value { UserDefaults.standard.set(value, forKey: key) }
-        else { UserDefaults.standard.removeObject(forKey: key) }
-    }
-
-    private func logoImage() -> NSImage? {
-        guard let url = Bundle.main.url(forResource: "GazeBreakLogo", withExtension: "png")
-            ?? Bundle.module.url(forResource: "GazeBreakLogo", withExtension: "png"),
-              let image = NSImage(contentsOf: url) else { return nil }
-        image.size = NSSize(width: 18, height: 18)
-        return image
-    }
-
     deinit {
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         workspaceObservers.forEach { workspaceCenter.removeObserver($0) }
-        mouseTrackingMonitors.forEach { NSEvent.removeMonitor($0) }
     }
 
     @objc private func togglePopover(_ sender: Any?) {
         guard let button = statusItem.button else { return }
-        if popover.isShown { popover.performClose(sender) }
-        else { popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY) }
+        if popover.isShown {
+            popover.performClose(sender)
+        } else {
+            // An accessory app may still be inactive after a status-item click.
+            // Activate it so the popover gets keyboard focus and resign events.
+            if #available(macOS 14.0, *) { NSApp.activate() }
+            else { NSApp.activate(ignoringOtherApps: true) }
+            model.setCountdownVisible(true)
+            let controller = NSHostingController(rootView: MenuView(model: model))
+            popover.contentViewController = controller
+            popover.contentSize = controller.view.fittingSize
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    func popoverDidShow(_ notification: Notification) {
+        dismissalMonitor.start()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        dismissalMonitor.stop()
+        // Release controls, subscriptions and layout work when hidden.
+        popover.contentViewController = nil
+        model.setCountdownVisible(isStatusItemHovered)
+    }
+
+    private func popoverEventTarget(_ event: NSEvent) -> PopoverDismissalMonitor.Target {
+        if event.window == statusItem.button?.window { return .statusItem }
+        if event.window?.level == .popUpMenu { return .nativeMenu }
+        guard let popoverWindow = popover.contentViewController?.view.window else { return .outside }
+        var window = event.window
+        while let current = window {
+            if current == popoverWindow { return .popover }
+            window = current.parent
+        }
+        return .outside
     }
 
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
-        button.title = isStatusItemHovered ? "  \(model.displayTime)" : ""
-        button.imagePosition = isStatusItemHovered ? .imageLeading : .imageOnly
-        button.toolTip = "Next break in \(model.displayTime)"
-        button.contentTintColor = model.isPaused ? .secondaryLabelColor : .labelColor
+        let title = isStatusItemHovered ? "  \(model.displayTime)" : ""
+        if button.title != title { button.title = title }
+        let position: NSControl.ImagePosition = isStatusItemHovered ? .imageLeading : .imageOnly
+        if button.imagePosition != position { button.imagePosition = position }
+        button.contentTintColor = model.isPaused || !model.remindersEnabled ? .secondaryLabelColor : .labelColor
+        button.toolTip = model.isOnBreak ? "GazeBreak — break in progress" : "GazeBreak — click for timer and controls"
     }
 
     private func installStatusItemHoverTracking() {
-        let localMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
-            self?.updateStatusItemHover()
-            return event
+        guard let button = statusItem.button else { return }
+        let observer = StatusHoverObserver { [weak self] hovered in
+            guard let self, self.isStatusItemHovered != hovered else { return }
+            self.isStatusItemHovered = hovered
+            self.model.setCountdownVisible(hovered || self.popover.isShown)
+            self.updateStatusItem()
         }
-        let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
-            self?.updateStatusItemHover()
-        }
-        if let localMonitor { mouseTrackingMonitors.append(localMonitor) }
-        if let globalMonitor { mouseTrackingMonitors.append(globalMonitor) }
-    }
-
-    private func updateStatusItemHover() {
-        guard let button = statusItem?.button, let window = button.window else { return }
-        let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
-        let hovered = buttonFrame.contains(NSEvent.mouseLocation)
-        guard hovered != isStatusItemHovered else { return }
-        isStatusItemHovered = hovered
-        updateStatusItem()
+        statusHoverObserver = observer
+        button.addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: observer,
+            userInfo: nil
+        ))
     }
 
     private func showReminder() {
         guard reminderWindow == nil else { return }
-        let controller = NSHostingController(rootView: ReminderView(model: model) { [weak self] in
-            self?.dismissReminder()
-        })
+        let controller = NSHostingController(rootView: ReminderView(model: model))
         let window = NSPanel(contentViewController: controller)
         window.styleMask = [.borderless, .nonactivatingPanel]
         window.level = .floating
@@ -195,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isOpaque = false
         window.hasShadow = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.setContentSize(NSSize(width: 390, height: 285))
+        window.setContentSize(NSSize(width: 390, height: 310))
         window.center()
         window.makeKeyAndOrderFront(nil)
         reminderWindow = window
@@ -203,150 +172,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func dismissReminder() {
         reminderWindow?.orderOut(nil)
+        reminderWindow?.contentViewController = nil
         reminderWindow = nil
     }
 }
 
-@MainActor
-final class GazeBreakModel: ObservableObject {
-    @Published var intervalMinutes: Int {
-        didSet { UserDefaults.standard.set(intervalMinutes, forKey: Defaults.intervalMinutes) }
-    }
-    @Published var breakSeconds: Int {
-        didSet { UserDefaults.standard.set(breakSeconds, forKey: Defaults.breakSeconds) }
-    }
-    @Published private(set) var secondsRemaining: Int
-    @Published private(set) var isPaused = false
-    @Published private(set) var isLongBreak = false
-    @Published var remindersEnabled: Bool {
-        didSet { UserDefaults.standard.set(remindersEnabled, forKey: Defaults.remindersEnabled) }
-    }
-    @Published var soundEnabled: Bool {
-        didSet { UserDefaults.standard.set(soundEnabled, forKey: Defaults.soundEnabled) }
-    }
-    @Published var breakSoundName: String {
-        didSet { UserDefaults.standard.set(breakSoundName, forKey: Defaults.breakSoundName) }
-    }
-    @Published var soundVolume: Double {
-        didSet { UserDefaults.standard.set(soundVolume, forKey: Defaults.soundVolume) }
-    }
-    var onTick: (() -> Void)?
-    var onReminder: (() -> Void)?
-    private var timer: Timer?
-    private var focusSeconds = 0
-    private var systemPaused = false
-    private let longBreakAfterSeconds = 2 * 60 * 60
-    let longBreakSeconds = 15 * 60
-
-    private enum Defaults {
-        static let intervalMinutes = "intervalMinutes"
-        static let breakSeconds = "breakSeconds"
-        static let remindersEnabled = "remindersEnabled"
-        static let soundEnabled = "soundEnabled"
-        static let breakSoundName = "breakSoundName"
-        static let soundVolume = "soundVolume"
-    }
-
-    init() {
-        let savedInterval = min(max(UserDefaults.standard.object(forKey: Defaults.intervalMinutes) as? Int ?? 20, 1), 240)
-        intervalMinutes = savedInterval
-        breakSeconds = min(max(UserDefaults.standard.object(forKey: Defaults.breakSeconds) as? Int ?? 30, 5), 300)
-        remindersEnabled = UserDefaults.standard.object(forKey: Defaults.remindersEnabled) as? Bool ?? true
-        soundEnabled = UserDefaults.standard.object(forKey: Defaults.soundEnabled) as? Bool ?? true
-        let savedSoundName = UserDefaults.standard.string(forKey: Defaults.breakSoundName) ?? BreakSound.pop.rawValue
-        breakSoundName = BreakSound(rawValue: savedSoundName)?.rawValue ?? BreakSound.pop.rawValue
-        soundVolume = min(max(UserDefaults.standard.object(forKey: Defaults.soundVolume) as? Double ?? 0.35, 0), 1)
-        secondsRemaining = savedInterval * 60
-    }
-
-    deinit { timer?.invalidate() }
-
-    var formattedTime: String {
-        String(format: "%02d:%02d", secondsRemaining / 60, secondsRemaining % 60)
-    }
-
-    var displayTime: String { remindersEnabled ? formattedTime : "Off" }
-    var currentBreakSeconds: Int { isLongBreak ? longBreakSeconds : breakSeconds }
-
-    func start() {
-        timer?.invalidate()
-        let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.tick() }
-        }
-        timer = newTimer
-        RunLoop.main.add(newTimer, forMode: .common)
-    }
-
-    func togglePaused() { isPaused.toggle(); onTick?() }
-
-    func reset() {
-        focusSeconds = 0
-        finishCurrentBreak()
-    }
-
-    func finishCurrentBreak() {
-        let completedLongBreak = isLongBreak
-        isLongBreak = false
-        if completedLongBreak {
-            focusSeconds = 0
-        }
-        secondsRemaining = intervalMinutes * 60
-        isPaused = false
-        onTick?()
-    }
-
-    // Kept internal so the timer state machine can be tested without waiting 20 minutes.
-    func advanceOneSecondForTesting() { tick() }
-
-    func setCountdownForTesting(_ seconds: Int) { secondsRemaining = max(0, seconds) }
-
-    func setFocusSecondsForTesting(_ seconds: Int) { focusSeconds = max(0, seconds) }
-
-    func pauseForSystem() {
-        guard !isPaused else { return }
-        systemPaused = true
-        isPaused = true
-        onTick?()
-    }
-
-    func resumeFromSystem() {
-        guard systemPaused else { return }
-        systemPaused = false
-        isPaused = false
-        onTick?()
-    }
-
-    func updateInterval(_ value: Int) {
-        intervalMinutes = value
-        reset()
-    }
-
-    private func tick() {
-        guard !isPaused, remindersEnabled else { return }
-        focusSeconds += 1
-        if secondsRemaining > 1 {
-            secondsRemaining -= 1
-        } else {
-            secondsRemaining = 0
-            isLongBreak = focusSeconds >= longBreakAfterSeconds
-            isPaused = true
-            onReminder?()
-        }
-        onTick?()
-    }
-}
-
-@discardableResult
-fileprivate func advanceBreakCountdown(_ remaining: inout Int) -> Bool {
-    if remaining > 1 {
-        remaining -= 1
-        return false
-    }
-    remaining = 0
-    return true
-}
-
-private enum BreakSound: String, CaseIterable, Identifiable {
+enum BreakSound: String, CaseIterable, Identifiable {
     case pop = "Pop"
     case tink = "Tink"
     case ping = "Ping"
@@ -367,26 +198,30 @@ struct MenuView: View {
                     Text("A tiny reset for your eyes").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "eye.circle.fill").font(.system(size: 26)).foregroundStyle(.blue)
+                Image(systemName: "eye.circle.fill").font(.system(size: 26)).foregroundStyle(Color.accentColor)
             }
             .padding(.bottom, 20)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(!model.remindersEnabled ? "REMINDERS OFF" : (model.isPaused ? "PAUSED" : "NEXT BREAK IN"))
+                Text(!model.remindersEnabled ? "REMINDERS OFF" : (model.isOnBreak ? "BREAK IN PROGRESS" : (model.isPaused ? "PAUSED" : "NEXT BREAK IN")))
                     .font(.caption2.weight(.bold)).foregroundStyle(.secondary)
                 Text(model.displayTime)
                     .font(.system(size: 46, weight: .medium, design: .rounded)).monospacedDigit()
-                Text(model.isLongBreak ? "Take a longer 15-minute reset." : "Look at something roughly 6 m / 20 ft away.")
+                Text("Look at something roughly 6 m / 20 ft away.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14))
+            .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
 
             HStack(spacing: 10) {
                 Button(model.isPaused ? "Resume" : "Pause") { model.togglePaused() }
-                    .buttonStyle(.borderedProminent).tint(.blue)
+                    .buttonStyle(.borderedProminent).tint(.accentColor)
+                    .disabled(!model.remindersEnabled || model.isOnBreak)
                 Button("Reset") { model.reset() }.buttonStyle(.bordered)
                 Spacer()
+                Button("Break now") { model.beginBreak() }
+                    .buttonStyle(.bordered)
+                    .disabled(!model.remindersEnabled || model.isOnBreak || model.isSystemPaused)
             }.padding(.vertical, 18)
 
             Divider().padding(.bottom, 14)
@@ -443,34 +278,64 @@ struct MenuView: View {
                     .buttonStyle(.link).font(.caption).foregroundStyle(.secondary)
             }.padding(.top, 18)
         }
-        .padding(20).frame(width: 320)
+        .padding(20).frame(width: 340)
+        .foregroundStyle(.primary)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .tint(.accentColor)
     }
+}
+
+@MainActor
+private final class StatusHoverObserver: NSResponder {
+    let onHover: (Bool) -> Void
+
+    init(onHover: @escaping (Bool) -> Void) {
+        self.onHover = onHover
+        super.init()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func mouseEntered(with event: NSEvent) { onHover(true) }
+    override func mouseExited(with event: NSEvent) { onHover(false) }
 }
 
 struct ReminderView: View {
     @ObservedObject var model: GazeBreakModel
-    let dismiss: () -> Void
-    @State private var remaining: Int = 30
+    @State private var remaining: Int = 0
+    @State private var deadline: TimeInterval = 0
+    private let timer = Timer.publish(every: 1, tolerance: 0.1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "eye.fill").font(.system(size: 30)).foregroundStyle(.blue)
-            Text(model.isLongBreak ? "Take a longer reset" : "Look away for a moment").font(.title2.bold())
-            Text(model.isLongBreak ? "Step away from the screen for a few minutes, then come back refreshed." : "Find something in the distance, let your focus soften, and blink normally.")
+            Image(systemName: "eye.fill").font(.system(size: 30)).foregroundStyle(Color.accentColor)
+            Text("Look away for a moment").font(.title2.bold())
+            Text("Find something in the distance, let your focus soften, and blink normally.")
                 .multilineTextAlignment(.center).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Text(String(format: "%02d", remaining)).font(.system(size: 42, weight: .semibold, design: .rounded)).monospacedDigit().foregroundStyle(.blue)
+            Text(String(format: "%02d", remaining))
+                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                .monospacedDigit().foregroundStyle(Color.accentColor)
+                .accessibilityLabel("\(remaining) seconds remaining")
             HStack(spacing: 10) {
-                Button("Skip") { dismiss(); model.finishCurrentBreak() }.buttonStyle(.bordered)
-                Button("I’m back") { dismiss(); model.finishCurrentBreak() }.buttonStyle(.borderedProminent).tint(.blue)
+                Button("Skip") { model.finishCurrentBreak() }.buttonStyle(.bordered)
+                Button("Snooze 5 min") { model.snooze() }.buttonStyle(.bordered)
+                Button("I’m back") { model.finishCurrentBreak() }
+                    .buttonStyle(.borderedProminent).tint(.accentColor)
             }
         }
-        .padding(28).frame(width: 390, height: 285)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .onAppear { remaining = model.currentBreakSeconds }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            if advanceBreakCountdown(&remaining) {
+        .padding(28).frame(width: 390, height: 310)
+        .foregroundStyle(.primary)
+        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 24))
+        .tint(.accentColor)
+        .onAppear {
+            remaining = model.breakSeconds
+            deadline = ProcessInfo.processInfo.systemUptime + Double(remaining)
+        }
+        .onReceive(timer) { _ in
+            guard model.isOnBreak else { return }
+            // Elapsed time keeps the break accurate even when callbacks are delayed.
+            remaining = breakSecondsRemaining(until: deadline, now: ProcessInfo.processInfo.systemUptime)
+            if remaining == 0 {
                 playBreakCompletionSound(named: model.breakSoundName, enabled: model.soundEnabled, volume: model.soundVolume)
-                dismiss()
                 model.finishCurrentBreak()
             }
         }

@@ -1,3 +1,16 @@
+# Unreleased
+
+- Remove the two-hour/15-minute reset cycle; every reminder uses the configured short break
+- Use deadline scheduling instead of second-by-second background updates
+- Release the controls when closed and replace global mouse monitoring with icon hover tracking
+- Use a template menu-bar icon and consistent system appearance/accent colors
+- Add Break now and Snooze 5 min controls
+- Preserve manual pause and correctly handle overlapping screen sleep and inactive sessions
+- Dismiss stale reminders when resetting, changing interval, disabling reminders, or sleeping
+- Expand deterministic timer checks without touching user preferences
+- Close the controls on outside clicks and Escape, with click monitoring only while open
+- Add a Node/Vite documentation site and automatic GitHub Pages release history
+
 # GazeBreak 0.1.5
 
 ## Included

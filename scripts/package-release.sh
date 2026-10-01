@@ -35,13 +35,17 @@ build_architecture() {
     local arch="$1"
     local triple="${arch}-apple-macosx13.0"
     local scratch_path="$BUILD_ROOT/$arch"
-    local output_path="$scratch_path/${arch}-apple-macosx/release/GazeBreak"
 
     swift build \
         -c release \
         --triple "$triple" \
         --scratch-path "$scratch_path" \
         -Xswiftc -warnings-as-errors
+
+    # SwiftPM's output layout depends on the selected toolchain/build system.
+    local bin_path
+    bin_path="$(swift build -c release --triple "$triple" --scratch-path "$scratch_path" --show-bin-path)"
+    local output_path="$bin_path/GazeBreak"
 
     [[ -f "$output_path" ]] || die "SwiftPM did not produce $output_path"
     cp "$output_path" "$BUILD_ROOT/GazeBreak-$arch"

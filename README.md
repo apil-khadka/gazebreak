@@ -2,11 +2,16 @@
 
 A tiny macOS menu-bar app that helps prevent long, uninterrupted screen sessions.
 
-![GazeBreak logo](Sources/GazeBreak/Resources/GazeBreakLogo.png)
+<img src="Sources/GazeBreak/Resources/GazeBreakLogo.png" alt="GazeBreak logo" width="72" height="72">
 
 GazeBreak is named for the small, intentional pause it creates in a long period of close-focus work. The abstract mark represents an opening and breathing room rather than a literal eye or medical symbol.
 
 GazeBreak is licensed under the [Apache License 2.0](LICENSE).
+
+Read the [product documentation](https://apil-khadka.github.io/gazebreak/guide.html)
+and [release notes](https://apil-khadka.github.io/gazebreak/releases.html) on the
+GazeBreak website. The [website development guide](docs/README.md) covers the
+Node package and automatic GitHub Pages deployment.
 
 ## Install with Homebrew
 
@@ -61,12 +66,12 @@ For an experimental self-signed build, push a tag such as `self-v0.1.1`. The sel
 2. Choose the `GazeBreak` executable scheme.
 3. Run it on **My Mac**.
 
-For a deterministic timer smoke test, run `swift run GazeBreak --self-test`. It exercises countdown advancement, the reminder boundary, and break completion without waiting 20 minutes.
+For a deterministic timer smoke test, run `swift run GazeBreak --self-test`. It checks hidden/visible timer scheduling, pause and sleep handling, reminder boundaries, snooze, break completion, and preference persistence with an isolated settings store and simulated clock.
 
-The app is an accessory app, so it stays out of the Dock and lives in the menu bar. The menu-bar item shows only the eye icon until hovered, then briefly reveals the countdown. Click it to open the controls; clicking elsewhere closes the menu. The controls include the reminder sound, sound choice, and volume level.
+The app is an accessory app, so it stays out of the Dock and lives in the menu bar. The menu-bar item shows only the eye icon until hovered, then briefly reveals the countdown. Click it to open the controls; clicking elsewhere closes the menu. The controls include Break now, pause/reset, reminder sound, sound choice, and volume. A reminder can be skipped or snoozed for five minutes.
 
 The default timing is a 20-minute focus interval followed by a 30-second distance break. The reminder window is a floating panel that stays visible above other windows and across Spaces. Settings persist between launches, and the timer pauses when the macOS session becomes inactive.
 
-After roughly two hours of accumulated focus time, the app shows a longer 15-minute reset. Short-break skips do not erase that accumulated focus time; the Reset button starts the two-hour cycle over.
+Every reminder uses your configured short break length; there is no longer 15-minute reset. The focus timer schedules one wakeup for the next reminder while the menu is closed. A live countdown runs only while you hover over the icon or open the controls. Closed controls are released, and paused or disabled reminders do not run a timer. The menu-bar icon and controls follow the system appearance and accent color.
 
 The app does not diagnose or treat eye conditions. It is a reminder tool based on common digital-eye-strain guidance. If you have persistent symptoms or sudden flashes, a sudden increase in floaters, or a curtain/shadow in your vision, contact an eye-care professional promptly.

@@ -1,0 +1,104 @@
+{
+  "updatedAt": "2026-10-01T02:51:50.214Z",
+  "repository": {
+    "stars": 0,
+    "url": "https://github.com/apil-khadka/gazebreak"
+  },
+  "releases": [
+    {
+      "tag": "self-v0.1.5",
+      "name": "GazeBreak 0.1.5 (self-signed experimental)",
+      "prerelease": true,
+      "publishedAt": "2026-09-04T09:47:41Z",
+      "url": "https://github.com/apil-khadka/gazebreak/releases/tag/self-v0.1.5",
+      "notes": "Universal arm64 + x86_64 ad-hoc signed development build for macOS 13+. Not notarized and not Gatekeeper-trusted. Use only for testing.",
+      "assets": [
+        {
+          "name": "GazeBreak-macOS-universal.zip",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/self-v0.1.5/GazeBreak-macOS-universal.zip",
+          "bytes": 1380459
+        },
+        {
+          "name": "GazeBreak-macOS-universal.zip.sha256",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/self-v0.1.5/GazeBreak-macOS-universal.zip.sha256",
+          "bytes": 101
+        }
+      ]
+    },
+    {
+      "tag": "self-v0.1.4",
+      "name": "GazeBreak 0.1.4 (self-signed experimental)",
+      "prerelease": true,
+      "publishedAt": "2026-08-31T18:14:07Z",
+      "url": "https://github.com/apil-khadka/gazebreak/releases/tag/self-v0.1.4",
+      "notes": "Universal arm64 + x86_64 ad-hoc signed development build for macOS 13+. Not notarized and not Gatekeeper-trusted. Use only for testing.",
+      "assets": [
+        {
+          "name": "GazeBreak-macOS-universal.zip",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/self-v0.1.4/GazeBreak-macOS-universal.zip",
+          "bytes": 1369110
+        },
+        {
+          "name": "GazeBreak-macOS-universal.zip.sha256",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/self-v0.1.4/GazeBreak-macOS-universal.zip.sha256",
+          "bytes": 101
+        }
+      ]
+    },
+    {
+      "tag": "self-v0.1.3",
+      "name": "GazeBreak 0.1.3 (self-signed experimental)",
+      "prerelease": true,
+      "publishedAt": "2026-08-31T18:11:54Z",
+      "url": "https://github.com/apil-khadka/gazebreak/releases/tag/self-v0.1.3",
+      "notes": "Universal arm64 + x86_64 ad-hoc signed development build for macOS 13+. Not notarized and not Gatekeeper-trusted. Use only for testing.",
+      "assets": [
+        {
+          "name": "GazeBreak-macOS-universal.zip",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/self-v0.1.3/GazeBreak-macOS-universal.zip",
+          "bytes": 1346919
+        },
+        {
+          "name": "GazeBreak-macOS-universal.zip.sha256",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/self-v0.1.3/GazeBreak-macOS-universal.zip.sha256",
+          "bytes": 101
+        }
+      ]
+    },
+    {
+      "tag": "self-v0.1.2",
+      "name": "GazeBreak 0.1.2 (self-signed experimental)",
+      "prerelease": true,
+      "publishedAt": "2026-08-31T18:08:58Z",
+      "url": "https://github.com/apil-khadka/gazebreak/releases/tag/self-v0.1.2",
+      "notes": "Universal arm64 + x86_64 ad-hoc signed development build for macOS 13+. Not notarized and not Gatekeeper-trusted. Use only for testing.",
+      "assets": [
+        {
+          "name": "GazeBreak-macOS-universal.zip",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/self-v0.1.2/GazeBreak-macOS-universal.zip",
+          "bytes": 1346631
+        },
+        {
+          "name": "GazeBreak-macOS-universal.zip.sha256",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/self-v0.1.2/GazeBreak-macOS-universal.zip.sha256",
+          "bytes": 101
+        }
+      ]
+    },
+    {
+      "tag": "v0.1.0",
+      "name": "GazeBreak 0.1.0",
+      "prerelease": false,
+      "publishedAt": "2026-08-31T16:24:40Z",
+      "url": "https://github.com/apil-khadka/gazebreak/releases/tag/v0.1.0",
+      "notes": "# GazeBreak 0.1.0\n\nThe first public release of GazeBreak, a quiet macOS menu-bar companion for regular screen breaks.\n\n## Included\n\n- 20-minute focus timer with configurable 30-second distance breaks\n- 15-minute longer reset after roughly two hours of accumulated focus time\n- Pause, resume, reset, skip, and reminder enable/disable controls\n- Automatic pause around inactive macOS sessions and display sleep\n- Settings persistence between launches\n- Apple Silicon macOS app bundle with an abstract GazeBreak logo\n\n## Compatibility\n\n- macOS 13 or later\n- Apple Silicon (arm64)\n\nGazeBreak is a reminder tool, not medical advice or a treatment for eye conditions.\n",
+      "assets": [
+        {
+          "name": "GazeBreak-macOS-arm64.zip",
+          "url": "https://github.com/apil-khadka/gazebreak/releases/download/v0.1.0/GazeBreak-macOS-arm64.zip",
+          "bytes": 1284323
+        }
+      ]
+    }
+  ]
+}

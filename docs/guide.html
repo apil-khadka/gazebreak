@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f1e8">
+  <meta name="description" content="Install, use, and customize the GazeBreak macOS menu-bar app.">
+  <title>Documentation | GazeBreak</title>
+  <link rel="icon" type="image/png" href="assets/GazeBreakLogo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="nav shell">
+    <a class="brand" href="./" aria-label="GazeBreak home"><img src="assets/GazeBreakLogo.png" alt="" width="36" height="36"><span>GazeBreak</span></a>
+    <nav class="nav-links" aria-label="Primary navigation"><a href="guide.html" aria-current="page">Docs</a><a href="releases.html" >Releases</a><a href="https://github.com/apil-khadka/gazebreak">GitHub ↗</a><a class="repo-stars" href="https://github.com/apil-khadka/gazebreak/stargazers" data-repo-stars>Stars</a></nav>
+  </header>
+  <main id="main" class="shell">
+    <section class="page-hero"><p class="eyebrow">The guide / Start here</p><h1>A little distance,<br>a simple routine.</h1><p class="lede">Install GazeBreak, choose your rhythm, and let the menu bar handle the reminders.</p></section>
+    <div class="docs-layout">
+      <aside class="docs-sidebar"><nav aria-label="On this page"><a href="#install">Install</a><a href="#controls">Use the controls</a><a href="#breaks">Take a break</a><a href="#settings">Customize</a><a href="#update">Update or uninstall</a><a href="#questions">Common questions</a></nav></aside>
+      <div class="docs-content">
+        <section id="install"><p class="section-label">01 / Installation</p><h2>Start in the menu bar.</h2><p>GazeBreak runs on macOS 13 or later. The Homebrew tap currently distributes an Apple Silicon build. Universal Apple Silicon and Intel builds are available as experimental previews; check the <a href="releases.html">release notes</a> for each download.</p>
+          <ol><li>Install <a href="https://brew.sh/">Homebrew</a> if you do not already have it.</li><li>Run these commands in Terminal:</li></ol>
+          <div class="code-block"><code>brew tap apil-khadka/tap<br>brew install --cask gazebreak</code><button class="copy-button" data-copy="brew tap apil-khadka/tap&#10;brew install --cask gazebreak">Copy</button></div>
+          <p>Open GazeBreak from Applications. Look for its icon in the menu bar at the top of the screen. It does not open a main window or appear in the Dock.</p>
+          <h3>Prefer a manual download?</h3><p>Choose a ZIP from <a href="releases.html">Releases</a>, unzip it, and move GazeBreak.app into Applications. Read the architecture and signing notes for your chosen version. Current experimental builds are ad-hoc signed and are not notarized by Apple; they are intended for testing.</p>
+        </section>
+        <section id="controls"><p class="section-label">02 / Everyday use</p><h2>Open it when you need it.</h2><p>Hover over the menu-bar icon to see the focus countdown. Click the icon to open the controls. Pause holds your remaining time; Resume continues it. Reset starts a fresh interval.</p>
+          <div class="note"><strong>Next version</strong><p>The next update adds Break now, explicit outside-click dismissal, and Escape to close. It also stops second-by-second background work when the countdown is hidden.</p></div>
+          <figure class="app-preview"><div class="preview-label">Next-version preview · light and dark appearance</div><div class="preview-grid"><img src="assets/menu-light.png" alt="GazeBreak controls in light appearance with timer, pause, reset, break now, and sound settings" width="680" height="1024" loading="lazy"><img src="assets/menu-dark.png" alt="The same GazeBreak controls in dark appearance" width="680" height="1024" loading="lazy"></div><figcaption>Actual app views rendered from the next-version source. Published downloads may have different controls.</figcaption></figure>
+        </section>
+        <section id="breaks"><p class="section-label">03 / Breaks</p><h2>A brief pause in close focus.</h2><p>The default rhythm is 20 minutes of focus followed by a 30-second reminder. The floating reminder stays visible across Spaces. Let its countdown finish, or choose Skip or I’m back to return sooner.</p><p>Published versions include a longer reset after accumulated focus time. The next version removes that cycle: every reminder will use your configured short break length. It also adds Snooze 5 min, which postpones a reminder without changing your usual interval.</p></section>
+        <section id="settings"><p class="section-label">04 / Preferences</p><h2>Set your rhythm.</h2><div class="table-wrap"><table><thead><tr><th>Control</th><th>Choices</th></tr></thead><tbody><tr><td>Focus interval</td><td>20, 30, 45, or 60 minutes</td></tr><tr><td>Break length</td><td>20, 30, 45, or 60 seconds</td></tr><tr><td>Enable reminders</td><td>Turn reminders on or off</td></tr><tr><td>Sound at break end</td><td>On or off</td></tr><tr><td>Sound and volume</td><td>Pop, Tink, Ping, Glass, or Bottle; adjustable volume</td></tr></tbody></table></div><p>Settings are saved between launches. Sound selection and volume are available in the 0.1.5 experimental preview and later versions. Use Test to preview the completion sound.</p></section>
+        <section id="update"><p class="section-label">05 / Maintenance</p><h2>Stay up to date.</h2><p>For a Homebrew install:</p><div class="code-block"><code>brew update<br>brew upgrade --cask gazebreak</code><button class="copy-button" data-copy="brew update&#10;brew upgrade --cask gazebreak">Copy</button></div><p>For a manual install, quit GazeBreak and replace the app in Applications with the new download. Your settings remain saved. Read <a href="releases.html">Releases</a> to see what changed.</p><h3>Uninstall</h3><p>Quit GazeBreak from its menu. For Homebrew, run <code>brew uninstall --cask gazebreak</code>. For a manual install, move GazeBreak.app from Applications to the Trash.</p></section>
+        <section id="questions"><p class="section-label">06 / Common questions</p><h2>A few useful details.</h2>
+          <details><summary>Why is there no Dock icon?</summary><p>GazeBreak is a menu-bar app. Open its controls from the icon at the top of your screen.</p></details>
+          <details><summary>What happens when my Mac sleeps?</summary><p>The focus timer pauses around display sleep and inactive sessions. The next version also keeps screen and session pauses separate so waking the display cannot resume a still-locked session.</p></details>
+          <details><summary>Does it send usage data anywhere?</summary><p>The app has no analytics, account, or network code. Its timer and preferences run locally. This website loads fonts from Google Fonts, uses public GitHub release information, and requests the public repository star count from GitHub.</p></details>
+          <details><summary>Can I see the source or report a problem?</summary><p>The app is open source under Apache 2.0. Visit the <a href="https://github.com/apil-khadka/gazebreak">GitHub repository</a> for source, build instructions, and issues.</p></details>
+          <details><summary>Does GazeBreak provide medical advice?</summary><p>No. It is a reminder tool, not a diagnosis or treatment.</p></details>
+        </section>
+      </div>
+    </div>
+  </main>
+  <footer class="footer shell"><span>GazeBreak, a gentle reminder tool</span><div><a href="https://github.com/apil-khadka/gazebreak">GitHub</a><a href="https://github.com/apil-khadka/gazebreak/blob/main/LICENSE">Apache 2.0</a><span>Not medical advice.</span></div></footer>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
