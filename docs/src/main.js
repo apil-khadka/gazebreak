@@ -19,12 +19,17 @@ function showStars(count) {
   for (const link of starLinks) link.textContent = `${count.toLocaleString('en')} ${count === 1 ? 'star' : 'stars'}`;
 }
 
-// Show the build snapshot first. Refresh stars live without requiring a token.
+// Fetch once on page load; retain the build snapshot if GitHub is unavailable.
+let liveStars;
 fetch('https://api.github.com/repos/apil-khadka/gazebreak', { signal: AbortSignal.timeout(5000) })
   .then(response => { if (!response.ok) throw new Error('Repository unavailable'); return response.json(); })
-  .then(repo => { liveStars = repo.stargazers_count; showStars(liveStars); })
+  .then(repo => {
+    if (Number.isInteger(repo.stargazers_count) && repo.stargazers_count >= 0) {
+      liveStars = repo.stargazers_count;
+      showStars(liveStars);
+    }
+  })
   .catch(() => {}); // Keep the snapshot when offline or GitHub's API is rate-limited.
-let liveStars;
 
 const releaseList = document.querySelector('[data-release-list]');
 const releaseSummary = document.querySelector('[data-release-summary]');
