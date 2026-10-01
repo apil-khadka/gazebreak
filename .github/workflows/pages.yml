@@ -38,7 +38,7 @@ jobs:
         with:
           # Release events may point at tags; always publish the current docs.
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'main' }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
