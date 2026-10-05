@@ -39,7 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         statusItem.button?.imagePosition = .imageOnly
-        let icon = NSImage(systemSymbolName: "eye", accessibilityDescription: "GazeBreak")
+        let icon = NSImage(systemSymbolName: "eye.fill", accessibilityDescription: "GazeBreak")?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 16, weight: .medium))
         icon?.isTemplate = true
         statusItem.button?.image = icon
         statusItem.button?.toolTip = "GazeBreak"
@@ -131,7 +132,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if button.title != title { button.title = title }
         let position: NSControl.ImagePosition = isStatusItemHovered ? .imageLeading : .imageOnly
         if button.imagePosition != position { button.imagePosition = position }
-        button.contentTintColor = model.isPaused || !model.remindersEnabled ? .secondaryLabelColor : .labelColor
+        // Let the menu bar choose the template image tint for its current appearance.
+        button.contentTintColor = nil
         button.toolTip = model.isOnBreak ? "GazeBreak — break in progress" : "GazeBreak — click for timer and controls"
     }
 
